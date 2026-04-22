@@ -54,11 +54,13 @@ Linux: `./scripts/linux/start-main.sh 5`
 
 On a seperate machine connected in the same LAN of the running orchestrator, you can run these scripts to add additional (1-8) workers that the orchestrator can use.  In order to run this, first you MUST obtain the ip address of the orchestrator.  This allows the workers to register with the orchestrator
 
-This requires that the orchestator machine allows inbound TCP on port 8000.   
+This requires that the orchestator machine allows inbound TCP on port 8000.
 
-Windows: `./scripts/windows/start-workers-node.ps1 -OrchestratorIp <orchestrator-ip> -WorkerCount 4 -ComputerName Remote-Machine-1`
+Windows (Orchestrator): `New-NetFirewallRule -DisplayName "DistributedCompute-Orchestrator-8000" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8000`
 
-Linux: `./scripts/linux/start-workers-node.sh <orchestrator-ip> 4 8000 Remote-Machine-1`
+Windows (Worker): `./scripts/windows/start-workers-node.ps1 -OrchestratorIp <orchestrator-ip> -WorkerCount 4 -ComputerName Remote-Machine-1`
+
+Linux (Worker): `./scripts/linux/start-workers-node.sh <orchestrator-ip> 4 8000 Remote-Machine-1`
 
 stop:
   - Windows: `./scripts/windows/stop-workers-node.ps1`

@@ -22,6 +22,7 @@ export default function JobSubmitter({ problems, onJobDone, onProblemTypeChange 
   const [inputFile, setInputFile] = useState(null);
   const [workers, setWorkers] = useState([]);
   const [selectedWorkerIds, setSelectedWorkerIds] = useState([]);
+  const [runsPerWorker, setRunsPerWorker] = useState(3);
   const [status, setStatus] = useState(null); // null ,"running" , "done" ,"error"
   const [message, setMessage] = useState("");
   const pollRef = useRef(null);
@@ -169,36 +170,44 @@ export default function JobSubmitter({ problems, onJobDone, onProblemTypeChange 
     }
 
     const orderedWorkerIds = selectedWorkers.map((worker) => worker.worker_id);
+    const totalJobs = orderedWorkerIds.length * runsPerWorker;
+    let jobsDone = 0;
 
     for (let w = 1; w <= orderedWorkerIds.length; w++) {
-      setMessage(`Benchmarking with ${w}/${orderedWorkerIds.length} selected worker(s)…`);
-      try {
-        const workerSubset = orderedWorkerIds.slice(0, w);
-        const job = await submitJob(problemType, input, w, workerSubset);
-        // Poll synchronously until done
-        await new Promise((resolve, reject) => {
-          const id = setInterval(async () => {
-            try {
-              const j = await fetchJob(job.job_id);
-              if (j.status === "done" || j.status === "failed") {
+      const workerSubset = orderedWorkerIds.slice(0, w);
+      for (let run = 1; run <= runsPerWorker; run++) {
+        jobsDone++;
+        setMessage(
+          `Worker count ${w}/${orderedWorkerIds.length} — run ${run}/${runsPerWorker} (job ${jobsDone}/${totalJobs})…`
+        );
+        try {
+          const job = await submitJob(problemType, input, w, workerSubset);
+          await new Promise((resolve, reject) => {
+            const id = setInterval(async () => {
+              try {
+                const j = await fetchJob(job.job_id);
+                if (j.status === "done" || j.status === "failed") {
+                  clearInterval(id);
+                  resolve(j);
+                }
+              } catch (err) {
                 clearInterval(id);
-                resolve(j);
+                reject(err);
               }
-            } catch (err) {
-              clearInterval(id);
-              reject(err);
-            }
-          }, POLL_INTERVAL_MS);
-        });
-      } catch (err) {
-        setStatus("error");
-        setMessage(`Benchmark error at w=${w}: ${err.message}`);
-        return;
+            }, POLL_INTERVAL_MS);
+          });
+        } catch (err) {
+          setStatus("error");
+          setMessage(`Benchmark error at w=${w} run=${run}: ${err.message}`);
+          return;
+        }
       }
     }
     setStatus("done");
-    setMessage(`Benchmark complete — tested 1..${orderedWorkerIds.length} selected workers.`);
-    onJobDone(null); // trigger metrics refresh without a specific job result
+    setMessage(
+      `Benchmark complete — tested 1..${orderedWorkerIds.length} workers × ${runsPerWorker} run(s) each.`
+    );
+    onJobDone(null);
   }
 
   //--render
@@ -337,6 +346,24 @@ export default function JobSubmitter({ problems, onJobDone, onProblemTypeChange 
         </p>
       </div>
 
+      {/* Runs per worker */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Runs per worker count
+        </label>
+        <input
+          type="number"
+          min={1}
+          max={20}
+          value={runsPerWorker}
+          onChange={(e) => setRunsPerWorker(Math.max(1, Math.min(20, Number(e.target.value))))}
+          className="w-24 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+        <p className="mt-1 text-xs text-gray-500">
+          Each worker count (1→{selectedWorkers.length}) will run this many times; the chart shows the average.
+        </p>
+      </div>
+
       {/* Status */}
       {status && (
         <div
@@ -359,7 +386,9 @@ export default function JobSubmitter({ problems, onJobDone, onProblemTypeChange 
           disabled={status === "running"}
           className="w-full bg-emerald-600 text-white rounded-md py-2 font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors"
         >
-          {status === "running" ? "Running…" : `Run benchmark (1 → ${Math.max(1, selectedWorkers.length)} workers)`}
+          {status === "running"
+            ? "Running…"
+            : `Run benchmark (1 → ${Math.max(1, selectedWorkers.length)} workers × ${runsPerWorker} run${runsPerWorker !== 1 ? "s" : ""})`}
         </button>
       </div>
     </form>
