@@ -105,16 +105,24 @@ class NaiveBayesProblem(BaseProblem):
         }
 
     def aggregate(self, partial_results: List[Dict[str, Any]]) -> Dict[str, Any]:
+        # Global class counts after combining all workers.
         class_counts = Counter()
+        # Global total feature counts for each class.
         total_feature_count = Counter()
+        # Global per-class, per-feature counts.
         feature_counts = defaultdict(Counter)
+        # Global vocabulary = all chunk vocabularies.
         vocabulary = set()
 
         for partial in partial_results:
+            # Merge class counts from this worker into the global counts.
             class_counts.update(partial["class_counts"])
+            # Merge total feature counts for each class
             total_feature_count.update(partial["total_feature_count"])
+            # Add all features seen by this worker into the global vocabulary.
             vocabulary.update(partial["vocabulary"])
 
+            # Merge per-feature counts for each class.
             for label, feats in partial["feature_counts"].items():
                 feature_counts[label].update(feats)
 
@@ -124,6 +132,14 @@ class NaiveBayesProblem(BaseProblem):
             "feature_counts": {label: dict(cnt) for label, cnt in feature_counts.items()},
             "vocabulary": sorted(vocabulary),
         }
+
+'''
+Commented out the finalize_model and predict_one functions
+They are not needed for the project, and can be implemented in the future
+finalize_model() is based on maximum likelihood estimation with Laplace smoothing
+predict_one() computes the log-probability of each class given the input features and returns the class with the highest score.
+
+
 
     def finalize_model(self, aggregated: Dict[str, Any]) -> Dict[str, Any]:
         class_counts = aggregated["class_counts"]
@@ -175,3 +191,4 @@ class NaiveBayesProblem(BaseProblem):
                 best_label = label
 
         return best_label
+'''

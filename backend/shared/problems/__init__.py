@@ -3,6 +3,7 @@
 from .word_frequency import WordFrequencyProblem
 from .prime_count import PrimeCountProblem
 from .naive_bayes import NaiveBayesProblem
+from .numeric_stats import NumericStatsProblem
 
 # Maps problem name (string) -> problem instance
 PROBLEM_REGISTRY = {
@@ -10,8 +11,8 @@ PROBLEM_REGISTRY = {
     for p in [
         WordFrequencyProblem(),
         PrimeCountProblem(),
-				NaiveBayesProblem()
-        # Add future problems here, e.g. MatrixMultiplyProblem()
+        NaiveBayesProblem(),
+        NumericStatsProblem(),
     ]
 }
 
