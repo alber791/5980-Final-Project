@@ -12,11 +12,14 @@ GET /health
 import os
 import time
 import logging
+import socket
+import asyncio
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Any
+import httpx
 
 from shared.problems import PROBLEM_REGISTRY
 
@@ -33,6 +36,13 @@ app.add_middleware(
 )
 
 WORKER_ID = os.environ.get("WORKER_ID", "worker-unknown")
+WORKER_PORT = int(os.environ.get("WORKER_PORT", "8001"))
+ORCHESTRATOR_URL = os.environ.get("ORCHESTRATOR_URL")
+COMPUTER_NAME = os.environ.get("COMPUTER_NAME") or socket.gethostname()
+WORKER_PUBLIC_URL = os.environ.get("WORKER_PUBLIC_URL") or f"http://{socket.gethostname()}:{WORKER_PORT}"
+HEARTBEAT_INTERVAL_SEC = int(os.environ.get("HEARTBEAT_INTERVAL_SEC", "10"))
+
+_heartbeat_task: asyncio.Task | None = None
 
 
 # ------------------------------------------------------------------ #
@@ -52,10 +62,71 @@ class SolveResponse(BaseModel):
     processing_time_ms: float
 
 
+class WorkerRegisterRequest(BaseModel):
+    worker_id: str
+    worker_url: str
+    computer_name: str
+
+
+async def _register_or_heartbeat_once() -> None:
+    if not ORCHESTRATOR_URL:
+        return
+
+    payload = WorkerRegisterRequest(
+        worker_id=WORKER_ID,
+        worker_url=WORKER_PUBLIC_URL,
+        computer_name=COMPUTER_NAME,
+    ).model_dump()
+
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        await client.post(f"{ORCHESTRATOR_URL}/workers/register", json=payload)
+
+
+async def _heartbeat_loop() -> None:
+    if not ORCHESTRATOR_URL:
+        logger.info("ORCHESTRATOR_URL not set; worker self-registration disabled")
+        return
+
+    while True:
+        try:
+            await _register_or_heartbeat_once()
+            logger.info(
+                "[%s] Registered/heartbeat sent to %s as %s on %s",
+                WORKER_ID,
+                ORCHESTRATOR_URL,
+                COMPUTER_NAME,
+                WORKER_PUBLIC_URL,
+            )
+        except Exception as exc:
+            logger.warning("[%s] Heartbeat failed: %s", WORKER_ID, exc)
+
+        await asyncio.sleep(HEARTBEAT_INTERVAL_SEC)
+
+
+@app.on_event("startup")
+async def startup_event() -> None:
+    global _heartbeat_task
+    _heartbeat_task = asyncio.create_task(_heartbeat_loop())
+
+
+@app.on_event("shutdown")
+async def shutdown_event() -> None:
+    global _heartbeat_task
+    if _heartbeat_task:
+        _heartbeat_task.cancel()
+        _heartbeat_task = None
+
+
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "worker_id": WORKER_ID}
+    return {
+        "status": "ok",
+        "worker_id": WORKER_ID,
+        "computer_name": COMPUTER_NAME,
+        "worker_url": WORKER_PUBLIC_URL,
+        "orchestrator_url": ORCHESTRATOR_URL,
+    }
 
 
 @app.post("/solve", response_model=SolveResponse)

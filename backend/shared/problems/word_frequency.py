@@ -20,6 +20,23 @@ class WordFrequencyProblem(BaseProblem):
     def name(self) -> str:
         return "word_frequency"
 
+    @property
+    def input_spec(self) -> Dict[str, Any]:
+        return {
+            "type": "file",
+            "label": "Upload text file",
+            "accept": [".txt"],
+            "placeholder": "Choose a .txt file",
+            "description": "Counts word frequencies in uploaded plain text",
+        }
+
+    def parse_input(self, input_data: Any) -> str:
+        if isinstance(input_data, str):
+            return input_data
+        if isinstance(input_data, dict) and isinstance(input_data.get("text"), str):
+            return input_data["text"]
+        raise ValueError("word_frequency expects plain text input")
+
     # ------------------------------------------------------------------
     # Split
     def split(self, input_data: str, num_chunks: int) -> List[str]:

@@ -1,0 +1,104 @@
+version: "3.9"
+
+# Run this file on machines that should provide workers only.
+# Required environment variables:
+#   ORCHESTRATOR_URL=http://<orchestrator-ip>:8000
+#   WORKER_HOST_IP=<this machine LAN IP, e.g. 192.168.1.25>
+# Optional:
+#   COMPUTER_NAME=<friendly-machine-name>
+
+x-worker-base: &worker-base
+  build:
+    context: ./backend
+    dockerfile: worker/Dockerfile
+  restart: unless-stopped
+  networks:
+    - app-net
+  environment:
+    ORCHESTRATOR_URL: ${ORCHESTRATOR_URL}
+    COMPUTER_NAME: ${COMPUTER_NAME:-lan-worker-host}
+
+services:
+  worker1:
+    <<: *worker-base
+    ports:
+      - "8101:8001"
+    environment:
+      ORCHESTRATOR_URL: ${ORCHESTRATOR_URL}
+      COMPUTER_NAME: ${COMPUTER_NAME:-lan-worker-host}
+      WORKER_ID: ${COMPUTER_NAME:-lan-worker-host}-worker1
+      WORKER_PUBLIC_URL: http://${WORKER_HOST_IP}:8101
+
+  worker2:
+    <<: *worker-base
+    ports:
+      - "8102:8001"
+    environment:
+      ORCHESTRATOR_URL: ${ORCHESTRATOR_URL}
+      COMPUTER_NAME: ${COMPUTER_NAME:-lan-worker-host}
+      WORKER_ID: ${COMPUTER_NAME:-lan-worker-host}-worker2
+      WORKER_PUBLIC_URL: http://${WORKER_HOST_IP}:8102
+
+  worker3:
+    <<: *worker-base
+    ports:
+      - "8103:8001"
+    environment:
+      ORCHESTRATOR_URL: ${ORCHESTRATOR_URL}
+      COMPUTER_NAME: ${COMPUTER_NAME:-lan-worker-host}
+      WORKER_ID: ${COMPUTER_NAME:-lan-worker-host}-worker3
+      WORKER_PUBLIC_URL: http://${WORKER_HOST_IP}:8103
+
+  worker4:
+    <<: *worker-base
+    ports:
+      - "8104:8001"
+    environment:
+      ORCHESTRATOR_URL: ${ORCHESTRATOR_URL}
+      COMPUTER_NAME: ${COMPUTER_NAME:-lan-worker-host}
+      WORKER_ID: ${COMPUTER_NAME:-lan-worker-host}-worker4
+      WORKER_PUBLIC_URL: http://${WORKER_HOST_IP}:8104
+
+  worker5:
+    <<: *worker-base
+    ports:
+      - "8105:8001"
+    environment:
+      ORCHESTRATOR_URL: ${ORCHESTRATOR_URL}
+      COMPUTER_NAME: ${COMPUTER_NAME:-lan-worker-host}
+      WORKER_ID: ${COMPUTER_NAME:-lan-worker-host}-worker5
+      WORKER_PUBLIC_URL: http://${WORKER_HOST_IP}:8105
+
+  worker6:
+    <<: *worker-base
+    ports:
+      - "8106:8001"
+    environment:
+      ORCHESTRATOR_URL: ${ORCHESTRATOR_URL}
+      COMPUTER_NAME: ${COMPUTER_NAME:-lan-worker-host}
+      WORKER_ID: ${COMPUTER_NAME:-lan-worker-host}-worker6
+      WORKER_PUBLIC_URL: http://${WORKER_HOST_IP}:8106
+
+  worker7:
+    <<: *worker-base
+    ports:
+      - "8107:8001"
+    environment:
+      ORCHESTRATOR_URL: ${ORCHESTRATOR_URL}
+      COMPUTER_NAME: ${COMPUTER_NAME:-lan-worker-host}
+      WORKER_ID: ${COMPUTER_NAME:-lan-worker-host}-worker7
+      WORKER_PUBLIC_URL: http://${WORKER_HOST_IP}:8107
+
+  worker8:
+    <<: *worker-base
+    ports:
+      - "8108:8001"
+    environment:
+      ORCHESTRATOR_URL: ${ORCHESTRATOR_URL}
+      COMPUTER_NAME: ${COMPUTER_NAME:-lan-worker-host}
+      WORKER_ID: ${COMPUTER_NAME:-lan-worker-host}-worker8
+      WORKER_PUBLIC_URL: http://${WORKER_HOST_IP}:8108
+
+networks:
+  app-net:
+    driver: bridge

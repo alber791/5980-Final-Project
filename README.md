@@ -20,7 +20,7 @@ class BaseProblem(ABC):
     # Runs in ORCHESTRATOR — merges all pieces
 ```
 
-### Built-in problems
+### Problems
 
 | Problem | Input | What it does |
 |---|---|---|
@@ -31,24 +31,38 @@ class BaseProblem(ABC):
 ## Quick Start
 
 ### Prerequisites
-- docker
+- docker (currently running) 
+- nodejs
+- python
 
 ### Run everything
-
-```bash
-docker compose up --build
-```
 
 | Service | URL |
 |---|---|
 | Frontend (React) | http://localhost:3000 |
 | Orchestrator API | http://localhost:8000 |
 
-### Stop
+**Orchestrator + local workers (single machine)**
 
-```bash
-docker compose down
-```
+This will run the orchestrator, frontend, and 1-8 workers (depending on the number you pass).  You can run the benchmarks with the local workers or optionally also run with additional workers from another machine (see workers-only machine setup).
+
+Windows: `./scripts/windows/start-main.ps1 -WorkerCount 5`
+
+Linux: `./scripts/linux/start-main.sh 5`
+
+**Workers-only machine setup**
+
+On a seperate machine connected in the same LAN of the running orchestrator, you can run these scripts to add additional (1-8) workers that the orchestrator can use.  In order to run this, first you MUST obtain the ip address of the orchestrator.  This allows the workers to register with the orchestrator
+
+This requires that the orchestator machine allows inbound TCP on port 8000.   
+
+Windows: `./scripts/windows/start-workers-node.ps1 -OrchestratorIp <orchestrator-ip> -WorkerCount 4 -ComputerName Remote-Machine-1`
+
+Linux: `./scripts/linux/start-workers-node.sh <orchestrator-ip> 4 8000 Remote-Machine-1`
+
+stop:
+  - Windows: `./scripts/windows/stop-workers-node.ps1`
+  - Linux: `./scripts/linux/stop-workers-node.sh`
 
 ---
 
@@ -56,8 +70,9 @@ docker compose down
 
 1. Open **http://localhost:3000**
 2. Select a problem type and paste/type input
-3. Click **"Full benchmark (1 -> 8)"** — this automatically submits the same job with 1, 2, 3, … 8 workers sequentially
-4. Switch to the **Performance Chart** tab to view timing graphs
+3. Select the number of registered workers you want to run the benchmark on
+4. Click **"Full benchmark"**
+5. Switch to the **Performance Chart** tab to view timing graphs
 
 ---
 

@@ -9,17 +9,35 @@ const client = axios.create({ baseURL: BASE });
 // Get problems available
 export async function fetchProblems() {
   const { data } = await client.get("/problems");
-  return data.problems; // string[]
+  return data.problems; // {name, input_spec}[]
 }
 
 //submit jobs
-export async function submitJob(problemType, inputData, numWorkers, cpuBudgetLabel) {
+export async function submitJob(problemType, inputData, numWorkers, selectedWorkerIds) {
+  if (inputData instanceof File) {
+    const formData = new FormData();
+    formData.append("problem_type", problemType);
+    formData.append("num_workers", String(numWorkers));
+    formData.append("selected_worker_ids", JSON.stringify(selectedWorkerIds ?? []));
+    formData.append("input_file", inputData);
+
+    const { data } = await client.post("/jobs", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return data;
+  }
+
   const { data } = await client.post("/jobs", {
     problem_type: problemType,
     input_data: inputData,
     num_workers: numWorkers,
-    cpu_budget_label: cpuBudgetLabel,
+    selected_worker_ids: selectedWorkerIds,
   });
+  return data;
+}
+
+export async function fetchWorkers() {
+  const { data } = await client.get("/workers");
   return data;
 }
 

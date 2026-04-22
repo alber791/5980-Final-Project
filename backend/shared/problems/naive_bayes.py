@@ -11,6 +11,7 @@ Aggregate: merge counts in aggregate step, then compute log probabilities for th
 from collections import Counter, defaultdict
 from math import log
 from typing import Dict, List, Any
+import re
 
 from .base import BaseProblem
 
@@ -23,6 +24,23 @@ class NaiveBayesProblem(BaseProblem):
     @property
     def name(self) -> str:
         return "naive_bayes"
+
+    @property
+    def input_spec(self) -> Dict[str, Any]:
+        return {
+            "type": "file",
+            "label": "Upload labeled text file",
+            "accept": [".txt", ".csv"],
+            "placeholder": "Expects a file input",
+            "description": "",
+        }
+
+    def parse_input(self, input_data: Any) -> List[Dict[str, Any]]:
+        if isinstance(input_data, str):
+            return input_data
+        if isinstance(input_data, dict) and isinstance(input_data.get("text"), str):
+            return input_data["text"]
+        raise ValueError("naive_bayes expects a labeled text file or list of examples")
 
     # All split does is partition the input list into roughly equal contiguous chunks.
     def split(self, input_data: List[Dict[str, Any]], num_chunks: int) -> List[List[Dict[str, Any]]]:

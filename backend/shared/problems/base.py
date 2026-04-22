@@ -1,7 +1,7 @@
 #abstract base class for problems, to be implemented by all concrete problems
 
 from abc import ABC, abstractmethod
-from typing import Any, List
+from typing import Any, Dict, List
 
 
 class BaseProblem(ABC):
@@ -10,6 +10,32 @@ class BaseProblem(ABC):
     @abstractmethod
     def name(self) -> str:
         """Unique name for this problem, used to route requests."""
+
+    @property
+    def input_spec(self) -> Dict[str, Any]:
+        """
+        Describes expected UI/API input for this problem.
+
+        Example structure:
+        {
+            "type": "number" | "text" | "file",
+            "label": "Human readable label",
+            "accept": [".txt"],
+            "placeholder": "optional placeholder"
+        }
+        """
+        return {
+            "type": "text",
+            "label": "Input",
+            "placeholder": "Enter input",
+        }
+
+    def parse_input(self, input_data: Any) -> Any:
+        """
+        Normalize raw request input into the problem's expected shape.
+        Override this in concrete problems when needed.
+        """
+        return input_data
 
     @abstractmethod
     def split(self, input_data: Any, num_chunks: int) -> List[Any]:

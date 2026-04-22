@@ -1,15 +1,13 @@
 """
 Prime-counting problem.
 
-Given a range [2, N], count (and optionally list) all primes in that range.
+Given a range [2, N], count all primes in that range.
 
 Input  : {"n": int}  — find all primes up to N
 Split  : divide the range [2, N] into num_chunks sub-ranges
 Solve  : run a sieve / trial-division on the assigned sub-range
-Aggregate: merge lists and return sorted prime list + total count
+Aggregate: merge lists and return total count
 
-This acts as a second example to demonstrate the extensible architecture.
-To add your own problem, follow this same pattern.
 """
 
 import math
@@ -59,9 +57,35 @@ class PrimeCountProblem(BaseProblem):
     def name(self) -> str:
         return "prime_count"
 
+    @property
+    def input_spec(self) -> Dict[str, Any]:
+        return {
+            "type": "number",
+            "label": "Upper bound N",
+            "field": "n",
+            "min": 2,
+            "placeholder": "e.g. 500000",
+            "description": "Counts primes in range [2, N]",
+        }
+
+    def parse_input(self, input_data: Any) -> Dict[str, int]:
+        if isinstance(input_data, dict):
+            raw_n = input_data.get("n")
+        else:
+            raw_n = input_data
+
+        try:
+            n = int(raw_n)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("prime_count expects integer input 'n'") from exc
+
+        if n < 2:
+            raise ValueError("prime_count requires n >= 2")
+
+        return {"n": n}
+
     # ------------------------------------------------------------------
     # Split
-    # ------------------------------------------------------------------
     def split(self, input_data: Dict[str, int], num_chunks: int) -> List[Dict[str, int]]:
         """
         Divide [2, n] into num_chunks sub-ranges of equal size.
@@ -86,16 +110,14 @@ class PrimeCountProblem(BaseProblem):
         return chunks
 
     # ------------------------------------------------------------------
-    # Solve  (runs in worker)
-    # ------------------------------------------------------------------
+    # Solve
     def solve(self, chunk: Dict[str, int]) -> Dict[str, Any]:
         """Count primes in [low, high] using a segmented sieve."""
         primes = _sieve_range(chunk["low"], chunk["high"])
         return {"count": len(primes), "primes": primes}
 
     # ------------------------------------------------------------------
-    # Aggregate  (runs in orchestrator)
-    # ------------------------------------------------------------------
+    # Aggregate
     def aggregate(self, partial_results: List[Dict[str, Any]]) -> Dict[str, Any]:
         total = 0
         all_primes: List[int] = []
