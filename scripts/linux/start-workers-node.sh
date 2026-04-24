@@ -29,6 +29,24 @@ export ORCHESTRATOR_URL="http://${ORCHESTRATOR_IP}:${ORCHESTRATOR_PORT}"
 export WORKER_HOST_IP="$LAN_IP"
 export COMPUTER_NAME="$COMPUTER_NAME"
 
+worker_ports=()
+for i in $(seq 1 "$WORKER_COUNT"); do
+  worker_ports+=("$((8100 + i))")
+done
+
+if command -v ufw >/dev/null 2>&1; then
+  for port in "${worker_ports[@]}"; do
+    if [[ "$EUID" -eq 0 ]]; then
+      ufw allow "${port}/tcp" >/dev/null || true
+    elif command -v sudo >/dev/null 2>&1; then
+      sudo -n ufw allow "${port}/tcp" >/dev/null 2>&1 || true
+    fi
+  done
+  echo "  Firewall (ufw) allow attempted for TCP ports: ${worker_ports[*]}"
+else
+  echo "  Warning: ufw not found; open TCP ports ${worker_ports[*]} manually if workers are unreachable."
+fi
+
 worker_services=()
 for i in $(seq 1 "$WORKER_COUNT"); do
   worker_services+=("worker${i}")

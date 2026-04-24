@@ -11,6 +11,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$firewallRuleName = "DistributedCompute-WorkerPorts"
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $composeFile = Join-Path $repoRoot "docker-compose.workers-only.yml"
 
@@ -38,6 +39,27 @@ $env:WORKER_HOST_IP = $lanIp
 $env:COMPUTER_NAME = $ComputerName
 
 $workerServices = 1..$WorkerCount | ForEach-Object { "worker$_" }
+$workerPorts = 1..$WorkerCount | ForEach-Object { 8100 + $_ }
+$portList = ($workerPorts -join ",")
+
+try {
+    $existingRule = Get-NetFirewallRule -DisplayName $firewallRuleName -ErrorAction SilentlyContinue
+    if ($existingRule) {
+        Remove-NetFirewallRule -DisplayName $firewallRuleName | Out-Null
+    }
+
+    New-NetFirewallRule `
+        -DisplayName $firewallRuleName `
+        -Direction Inbound `
+        -Action Allow `
+        -Protocol TCP `
+        -LocalPort $portList | Out-Null
+
+    Write-Host "  Firewall rule '$firewallRuleName' allows TCP ports: $portList"
+}
+catch {
+    Write-Warning "Failed to configure Windows firewall rule '$firewallRuleName'. Run this script as Administrator if orchestrator cannot reach workers."
+}
 
 Write-Host "Starting worker-only node with $WorkerCount worker(s)..."
 Write-Host "  ORCHESTRATOR_URL=$($env:ORCHESTRATOR_URL)"
