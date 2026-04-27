@@ -2,14 +2,14 @@
 layout 
  */
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import JobSubmitter from "./components/JobSubmitter";
 import PerformanceChart from "./components/PerformanceChart";
-import { clearMetrics, fetchMetrics, fetchProblems } from "./api";
+import { clearMetrics, fetchProblems } from "./api";
 
 export default function App() {
   const [problems, setProblems] = useState([]);
-  const [metrics, setMetrics] = useState([]);
+  const [chartHistory, setChartHistory] = useState([]);
   const [selectedProblem, setSelectedProblem] = useState("word_frequency");
 
   //---init
@@ -28,27 +28,19 @@ export default function App() {
       });
   }, []);
 
-  const refreshMetrics = useCallback(async () => {
-    try {
-      const data = await fetchMetrics(selectedProblem);
-      setMetrics(data);
-    } catch {
-      /* ignore */
-    }
-  }, [selectedProblem]);
-
-  useEffect(() => {
-    refreshMetrics();
-  }, [refreshMetrics]);
-
   //--callback
-  function handleJobDone(_job) {
-    refreshMetrics();
+  function handleJobDone(benchmark) {
+    if (!benchmark || !Array.isArray(benchmark.metrics)) return;
+    setChartHistory((previous) => [...previous, benchmark]);
   }
 
   async function handleClearMetrics() {
-    await clearMetrics();
-    setMetrics([]);
+    try {
+      await clearMetrics();
+    } catch {
+      // keep UI-clearing resilient even if backend clear fails
+    }
+    setChartHistory([]);
   }
 
   //--rendering
@@ -79,7 +71,7 @@ export default function App() {
         <section className="bg-white rounded-xl shadow p-6">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">Performance Chart</h2>
           <PerformanceChart
-            metrics={metrics}
+            chartHistory={chartHistory}
             problemType={selectedProblem}
             onClear={handleClearMetrics}
           />

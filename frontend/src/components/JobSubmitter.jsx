@@ -110,28 +110,6 @@ export default function JobSubmitter({ problems, onJobDone, onProblemTypeChange 
     }
   }
 
-  function pollUntilDone(jobId) {
-    pollRef.current = setInterval(async () => {
-      try {
-        const job = await fetchJob(jobId);
-        if (job.status === "done") {
-          stopPolling();
-          setStatus("done");
-          setMessage(`Finished in ${job.total_time_ms?.toFixed(1)} ms`);
-          onJobDone(job);
-        } else if (job.status === "failed") {
-          stopPolling();
-          setStatus("error");
-          setMessage(`Job failed: ${job.error}`);
-        }
-      } catch (e) {
-        stopPolling();
-        setStatus("error");
-        setMessage(`Polling error: ${e.message}`);
-      }
-    }, POLL_INTERVAL_MS);
-  }
-
   async function handleSubmit(e) {
     e.preventDefault();
     await handleBenchmark();
@@ -173,6 +151,8 @@ export default function JobSubmitter({ problems, onJobDone, onProblemTypeChange 
     const totalJobs = orderedWorkerIds.length * runsPerWorker;
     let jobsDone = 0;
 
+    const benchmarkJobs = [];
+
     for (let w = 1; w <= orderedWorkerIds.length; w++) {
       const workerSubset = orderedWorkerIds.slice(0, w);
       for (let run = 1; run <= runsPerWorker; run++) {
@@ -182,7 +162,7 @@ export default function JobSubmitter({ problems, onJobDone, onProblemTypeChange 
         );
         try {
           const job = await submitJob(problemType, input, w, workerSubset);
-          await new Promise((resolve, reject) => {
+          const completedJob = await new Promise((resolve, reject) => {
             const id = setInterval(async () => {
               try {
                 const j = await fetchJob(job.job_id);
@@ -196,6 +176,18 @@ export default function JobSubmitter({ problems, onJobDone, onProblemTypeChange 
               }
             }, POLL_INTERVAL_MS);
           });
+
+          if (completedJob.status === "failed") {
+            throw new Error(completedJob.error || "Job failed");
+          }
+
+          benchmarkJobs.push({
+            job_id: completedJob.job_id,
+            num_workers: completedJob.num_workers,
+            total_time_ms: completedJob.total_time_ms,
+            status: completedJob.status,
+            run_index: run,
+          });
         } catch (err) {
           setStatus("error");
           setMessage(`Benchmark error at w=${w} run=${run}: ${err.message}`);
@@ -207,7 +199,14 @@ export default function JobSubmitter({ problems, onJobDone, onProblemTypeChange 
     setMessage(
       `Benchmark complete — tested 1..${orderedWorkerIds.length} workers × ${runsPerWorker} run(s) each.`
     );
-    onJobDone(null);
+    onJobDone({
+      benchmark_id: `benchmark-${Date.now()}`,
+      problem_type: problemType,
+      created_at: new Date().toISOString(),
+      max_workers: orderedWorkerIds.length,
+      runs_per_worker: runsPerWorker,
+      metrics: benchmarkJobs,
+    });
   }
 
   //--render
