@@ -46,17 +46,22 @@ class BaseProblem(ABC):
 
 This will run the orchestrator, frontend, and 1-8 workers (depending on the number you pass).  You can run the benchmarks with the local workers or optionally also run with additional workers from another machine (see workers-only machine setup).
 
-Windows: `./scripts/windows/start-main.ps1 -WorkerCount 5`
+Note: These scripts must be ran with elevated privileges as they open ports for the remote workers to communicate with the orchestrator.  Running the stop scripts will close these ports 
 
-Linux: `./scripts/linux/start-main.sh 5`
+Windows: `./scripts/windows/start-main.ps1 -WorkerCount 5 -OrchestratorPort 8000`
+
+Linux: `./scripts/linux/start-main.sh 5 8000`
+
+Stop main stack:
+
+- Windows: `./scripts/windows/stop-main.ps1`
+- Linux: `./scripts/linux/stop-main.sh 8000`
 
 **Workers-only machine setup**
 
-On a seperate machine connected in the same LAN of the running orchestrator, you can run these scripts to add additional (1-8) workers that the orchestrator can use.  In order to run this, first you MUST obtain the ip address of the orchestrator.  This allows the workers to register with the orchestrator
+On a seperate machine connected in the same LAN of the running orchestrator, you can run these scripts to add additional (1-8) workers that the orchestrator can use.  In order to run this, first you MUST obtain the ip address of the orchestrator.  This allows the workers to register with the orchestrator.  In the commands below replace <orchestrator-ip> with the ip address of your main machine
 
-This requires that the orchestator machine allows inbound TCP on port 8000.
-
-Windows (Orchestrator): `New-NetFirewallRule -DisplayName "DistributedCompute-Orchestrator-8000" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8000`
+Note: These scripts must be ran with elevated privileges as they open ports for the remote workers to communicate with the orchestrator.  Running the stop scripts will close these ports 
 
 Windows (Worker): `./scripts/windows/start-workers-node.ps1 -OrchestratorIp <orchestrator-ip> -WorkerCount 4 -ComputerName Remote-Machine-1`
 
