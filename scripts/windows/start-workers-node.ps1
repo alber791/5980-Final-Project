@@ -7,7 +7,10 @@ param(
 
     [int]$OrchestratorPort = 8000,
 
-    [string]$ComputerName = $env:COMPUTERNAME
+    [string]$ComputerName = $env:COMPUTERNAME,
+
+    # Override auto-detected LAN IP if detection picks up a Docker/VM adapter
+    [string]$WorkerHostIp = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -22,8 +25,14 @@ if (-not (Test-Path $composeFile)) {
 $lanIp = (
     Get-NetIPAddress -AddressFamily IPv4 |
     Where-Object {
-        $_.IPAddress -notlike "169.254.*" -and
-        $_.IPAddress -ne "127.0.0.1" -and
+        $_.IPAddress -notlike "169.254.*" -and   # APIPA
+        $_.IPAddress -ne "127.0.0.1" -and        # loopback
+        $_.IPAddress -notlike "172.16.*" -and     # Docker / Hyper-V / WSL
+        $_.IPAddress -notlike "172.17.*" -and
+        $_.IPAddress -notlike "172.18.*" -and
+        $_.IPAddress -notlike "172.19.*" -and
+        $_.IPAddress -notlike "172.2*.*" -and
+        $_.IPAddress -notlike "172.3*.*" -and
         $_.PrefixOrigin -ne "WellKnown"
     } |
     Sort-Object -Property InterfaceMetric |
@@ -35,7 +44,7 @@ if (-not $lanIp) {
 }
 
 $env:ORCHESTRATOR_URL = "http://${OrchestratorIp}:${OrchestratorPort}"
-$env:WORKER_HOST_IP = $lanIp
+$env:WORKER_HOST_IP = if ($WorkerHostIp) { $WorkerHostIp } else { $lanIp }
 $env:COMPUTER_NAME = $ComputerName
 
 $workerServices = 1..$WorkerCount | ForEach-Object { "worker$_" }
@@ -61,10 +70,15 @@ catch {
     Write-Warning "Failed to configure Windows firewall rule '$firewallRuleName'. Run this script as Administrator if orchestrator cannot reach workers."
 }
 
+Write-Host ""
 Write-Host "Starting worker-only node with $WorkerCount worker(s)..."
 Write-Host "  ORCHESTRATOR_URL=$($env:ORCHESTRATOR_URL)"
-Write-Host "  WORKER_HOST_IP=$($env:WORKER_HOST_IP)"
+Write-Host "  WORKER_HOST_IP=$($env:WORKER_HOST_IP)  <<< workers will register with this LAN IP"
 Write-Host "  COMPUTER_NAME=$($env:COMPUTER_NAME)"
+Write-Host ""
+Write-Host "If the IP above is a Docker/VM address (172.x.x.x) instead of your real LAN IP,"
+Write-Host "stop here and re-run with: -WorkerHostIp <your-lan-ip>"
+Write-Host ""
 
 Push-Location $repoRoot
 try {

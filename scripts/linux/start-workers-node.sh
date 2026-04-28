@@ -19,9 +19,19 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-LAN_IP="$(hostname -I | awk '{print $1}')"
+# Pick the first non-Docker/non-loopback LAN IP
+LAN_IP=""
+while IFS= read -r ip; do
+  case "$ip" in
+    127.*|169.254.*|172.1[6-9].*|172.2[0-9].*|172.3[0-1].*) continue;;
+  esac
+  LAN_IP="$ip"
+  break
+done < <(hostname -I | tr ' ' '\n' | grep -v '^$')
+
 if [[ -z "$LAN_IP" ]]; then
-  echo "Unable to auto-detect LAN IPv4 address."
+  echo "Unable to auto-detect a non-Docker LAN IPv4 address."
+  echo "Set WORKER_HOST_IP manually and re-run: WORKER_HOST_IP=<your-lan-ip> $0 $*"
   exit 1
 fi
 
