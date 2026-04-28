@@ -248,6 +248,26 @@ def _get_worker_pool() -> List[Dict[str, Any]]:
 # ------------------------------------------------------------------ #
 # problem solve lifecycle
 
+# Probe a single worker's /health endpoint; returns True if reachable
+async def _probe_worker(client: httpx.AsyncClient, worker_url: str) -> bool:
+    try:
+        resp = await client.get(f"{worker_url}/health", timeout=5.0)
+        return resp.status_code == 200
+    except Exception:
+        return False
+
+
+# Pre-flight check: probe all selected workers and raise clearly if any are unreachable
+async def _assert_workers_reachable(client: httpx.AsyncClient, workers: List[Dict[str, Any]]) -> None:
+    results = await asyncio.gather(*[_probe_worker(client, w["worker_url"]) for w in workers])
+    unreachable = [w["worker_url"] for w, ok in zip(workers, results) if not ok]
+    if unreachable:
+        raise RuntimeError(
+            f"Orchestrator cannot reach the following worker(s) — check firewall rules and "
+            f"that WORKER_HOST_IP was set correctly on the remote machine: {unreachable}"
+        )
+
+
 # Dispatch one chunk to one worker and await the response
 async def dispatch_chunk(
     client: httpx.AsyncClient,
@@ -262,12 +282,19 @@ async def dispatch_chunk(
         "chunk": chunk,
         "chunk_index": chunk_index,
     }
-    response = await client.post(
-        f"{worker_url}/solve",
-        json=payload,
-        timeout=300.0,
-    )
-    response.raise_for_status()
+    try:
+        response = await client.post(
+            f"{worker_url}/solve",
+            json=payload,
+            timeout=300.0,
+        )
+        response.raise_for_status()
+    except httpx.ConnectError as exc:
+        raise RuntimeError(
+            f"Cannot connect to worker at {worker_url}/solve — "
+            f"verify WORKER_HOST_IP is the LAN IP visible from the orchestrator host, "
+            f"and that ports are open on the remote machine."
+        ) from exc
     elapsed_ms = (time.perf_counter() - dispatch_started_at) * 1000
     payload = response.json()
     payload["round_trip_time_ms"] = elapsed_ms
@@ -306,6 +333,15 @@ async def run_job(job_id: str, req: JobRequest) -> None:
         logger.info("[%s] Split into %d chunks for %d workers", job_id, num_chunks, num_workers)
 
         selected_workers = worker_pool[:num_workers]
+        logger.info(
+            "[%s] Dispatching to workers: %s",
+            job_id,
+            [(w["worker_id"], w["worker_url"]) for w in selected_workers],
+        )
+
+        # --- pre-flight: verify all selected workers are reachable before splitting work
+        async with httpx.AsyncClient() as probe_client:
+            await _assert_workers_reachable(probe_client, selected_workers)
 
         # --- dispatch
         t_dispatch_start = time.perf_counter()

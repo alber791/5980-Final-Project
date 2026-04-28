@@ -15,6 +15,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $firewallRuleName = "DistributedCompute-WorkerPorts"
+$dockerBackendRuleName = "Docker Desktop Backend"
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $composeFile = Join-Path $repoRoot "docker-compose.workers-only.yml"
 
@@ -52,6 +53,12 @@ $workerPorts = 1..$WorkerCount | ForEach-Object { 8100 + $_ }
 $portList = ($workerPorts -join ",")
 
 try {
+    $dockerBackendRule = Get-NetFirewallRule -DisplayName $dockerBackendRuleName -ErrorAction SilentlyContinue
+    if ($dockerBackendRule) {
+        Disable-NetFirewallRule -DisplayName $dockerBackendRuleName | Out-Null
+        Write-Host "  Disabled blocking firewall rule '$dockerBackendRuleName'."
+    }
+
     $existingRule = Get-NetFirewallRule -DisplayName $firewallRuleName -ErrorAction SilentlyContinue
     if ($existingRule) {
         Remove-NetFirewallRule -DisplayName $firewallRuleName | Out-Null
@@ -62,12 +69,13 @@ try {
         -Direction Inbound `
         -Action Allow `
         -Protocol TCP `
-        -LocalPort $workerPorts | Out-Null
+        -LocalPort $workerPorts `
+        -Profile Any | Out-Null
 
     Write-Host "  Firewall rule '$firewallRuleName' allows TCP ports: $portList"
 }
 catch {
-    Write-Warning "Failed to configure Windows firewall rule '$firewallRuleName'. Run this script as Administrator if orchestrator cannot reach workers."
+    Write-Warning "Failed to configure Windows firewall rules. Run this script as Administrator if orchestrator cannot reach workers."
 }
 
 Write-Host ""
