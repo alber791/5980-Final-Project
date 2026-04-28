@@ -53,7 +53,7 @@ try {
         -Direction Inbound `
         -Action Allow `
         -Protocol TCP `
-        -LocalPort $portList | Out-Null
+        -LocalPort $workerPorts | Out-Null
 
     Write-Host "  Firewall rule '$firewallRuleName' allows TCP ports: $portList"
 }
