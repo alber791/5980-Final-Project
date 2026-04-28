@@ -30,7 +30,7 @@ class NaiveBayesProblem(BaseProblem):
         return {
             "type": "file",
             "label": "Upload labeled text file",
-            "accept": [".txt", ".csv"],
+            "accept": [".py" ],
             "placeholder": "Expects a file input",
             "description": "",
         }
