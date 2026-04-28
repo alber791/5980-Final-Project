@@ -39,8 +39,28 @@ WORKER_ID = os.environ.get("WORKER_ID", "worker-unknown")
 WORKER_PORT = int(os.environ.get("WORKER_PORT", "8001"))
 ORCHESTRATOR_URL = os.environ.get("ORCHESTRATOR_URL")
 COMPUTER_NAME = os.environ.get("COMPUTER_NAME") or socket.gethostname()
-WORKER_PUBLIC_URL = os.environ.get("WORKER_PUBLIC_URL") or f"http://{socket.gethostname()}:{WORKER_PORT}"
 HEARTBEAT_INTERVAL_SEC = int(os.environ.get("HEARTBEAT_INTERVAL_SEC", "10"))
+
+# Validate WORKER_PUBLIC_URL: if it was set but the host part is empty (e.g.
+# "http://:8101" caused by an unresolved WORKER_HOST_IP compose variable),
+# fall back to the container hostname so registration is at least reachable
+# on the local Docker network. For LAN workers you must ensure WORKER_HOST_IP
+# is set in the environment before running docker compose.
+def _resolve_public_url() -> str:
+    raw = os.environ.get("WORKER_PUBLIC_URL", "").strip()
+    if raw and "://" in raw:
+        host_part = raw.split("://", 1)[1].split("/")[0].split(":")[0]
+        if host_part:
+            return raw
+        logger.warning(
+            "WORKER_PUBLIC_URL='%s' has an empty host (WORKER_HOST_IP was likely not set). "
+            "Falling back to container hostname. Remote dispatch from orchestrator WILL FAIL. "
+            "Fix: set WORKER_HOST_IP to this machine's LAN IP before running docker compose.",
+            raw,
+        )
+    return f"http://{socket.gethostname()}:{WORKER_PORT}"
+
+WORKER_PUBLIC_URL = _resolve_public_url()
 
 _heartbeat_task: asyncio.Task | None = None
 
@@ -106,6 +126,13 @@ async def _heartbeat_loop() -> None:
 @app.on_event("startup")
 async def startup_event() -> None:
     global _heartbeat_task
+    logger.info(
+        "[%s] Starting up — public URL: %s | orchestrator: %s | computer: %s",
+        WORKER_ID,
+        WORKER_PUBLIC_URL,
+        ORCHESTRATOR_URL,
+        COMPUTER_NAME,
+    )
     _heartbeat_task = asyncio.create_task(_heartbeat_loop())
 
 
