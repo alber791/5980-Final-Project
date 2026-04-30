@@ -6,7 +6,7 @@ A **FastAPI + React + Docker** project that demonstrates how distributing comput
 
 ## About Problems
 
-Every problem implements three methods in `backend/shared/problems/`:
+Every problem implements these methods in `backend/shared/problems/`:
 
 ```python
 class BaseProblem(ABC):
