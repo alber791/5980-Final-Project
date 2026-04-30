@@ -10,23 +10,44 @@ Every problem implements three methods in `backend/shared/problems/`:
 
 ```python
 class BaseProblem(ABC):
-    def split(self, input_data, num_chunks) -> List[chunk]
-    # Runs in ORCHESTRATOR — divides work
 
-    def solve(self, chunk) -> partial_result
-    # Runs in WORKER — processes one piece
+	@property
+	def name(self) -> str:
+	# UI name of problem
 
-    def aggregate(self, partial_results) -> final_result
-    # Runs in ORCHESTRATOR — merges all pieces
+	@property
+	def input_spec(self) -> Dict[str, Any]:
+		return {
+				"type": "file",
+				"label": "Upload labeled text file",
+				"accept": [".py" ],
+				"placeholder": "Expects a file input",
+				"description": "",
+		}
+
+	def parse_input(self, input_data: Any) -> Any:
+	# Runs in ORCHESTRATOR - parses original input from frontend
+
+	def split(self, input_data, num_chunks) -> List[chunk]:
+	# Runs in ORCHESTRATOR — divides work
+
+	def solve(self, chunk) -> partial_result:
+	# Runs in WORKER — processes one piece
+
+	def aggregate(self, partial_results) -> final_result:
+	# Runs in ORCHESTRATOR — merges all pieces
 ```
 
 ### Problems
 
 | Problem | Input | What it does |
 |---|---|---|
-| `word_frequency` | Plain text string | Counts word occurrences across chunks |
-| `prime_count` | `{"n": 500000}` | Finds all primes up to N using segmented |
+| `word_frequency` | Text | Counts word occurrences across chunks |
+| `prime_count` | number | Finds all primes up to N using segmented |
+| `numeric_stats` | File (`.json`, `.txt`, `.csv`) | Computes count, mean, std dev, min, and max via distributed partial aggregates |
+| `naive_bayes` | File (`.json`) | Tokenizes labeled documents and aggregates per-class feature counts for model training |
 
+NOTE: Example test files for problems can be found in /test_inputs
 
 ## Quick Start
 
@@ -76,10 +97,10 @@ stop:
 ## Running a Benchmark
 
 1. Open **http://localhost:3000**
-2. Select a problem type and paste/type input
-3. Select the number of registered workers you want to run the benchmark on
-4. Click **"Full benchmark"**
-5. Switch to the **Performance Chart** tab to view timing graphs
+2. Select a problem type
+3. Input the problem size (NOTE: Example inputs can be found in /test_inputs)
+4. Select the number of registered workers you want to run the benchmark on
+5. Select the number of times you want to run that benchmark
 
 ---
 

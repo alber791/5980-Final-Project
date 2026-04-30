@@ -48,6 +48,16 @@ class NumericStatsProblem(BaseProblem):
     def name(self) -> str:
         return "numeric_stats"
 
+    @property
+    def input_spec(self) -> Dict[str, Any]:
+        return {
+            "type": "file",
+            "label": "Upload numeric input file",
+            "accept": [".json", ".txt", ".csv"],
+            "placeholder": "Choose .json/.txt/.csv containing numbers",
+            "description": "Accepted formats: {\"numbers\": [...]} JSON, JSON array [...], or plain numbers separated by spaces/commas/newlines.",
+        }
+
     def split(self, input_data: Any, num_chunks: int) -> List[List[float]]:
         numbers = _parse_numbers(input_data)
         if not numbers:

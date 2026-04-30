@@ -1,17 +1,19 @@
 """
 Naive Bayes problem.
 
-Input  : a raw string/text file or a list of labeled examples (dicts with "label" and "features")
-Split  : divide the training set into roughly equal chunks
-Solve  : tokenize and count feature occurrences per class in each chunk
-Aggregate: merge counts in aggregate step, then compute log probabilities for the final model.
+Input     : a JSON array of {"label": str, "text": str} objects (raw text documents)
+Split     : divide the labeled documents into roughly equal chunks across workers
+Solve     : tokenize raw text per document and build class/feature counts within each chunk
+Aggregate : merge counts from all workers into a single combined result
+
+Each worker tokenizes its assigned documents from scratch, so larger datasets
+with more text per document translate directly into more CPU work per worker.
 """
 
 
 from collections import Counter, defaultdict
 from math import log
 from typing import Dict, List, Any
-import re
 
 from .base import BaseProblem
 
@@ -29,18 +31,39 @@ class NaiveBayesProblem(BaseProblem):
     def input_spec(self) -> Dict[str, Any]:
         return {
             "type": "file",
-            "label": "Upload labeled text file",
-            "accept": [".py" ],
-            "placeholder": "Expects a file input",
-            "description": "",
+            "label": "Upload labeled JSON file",
+            "accept": [".json"],
+            "placeholder": "Expects a JSON array of {\"label\": str, \"text\": str} objects",
+            "description": "Each entry must have a \"label\" (class name) and \"text\" (raw document text). Workers tokenize the text themselves.",
         }
 
     def parse_input(self, input_data: Any) -> List[Dict[str, Any]]:
+        import json
+
+        # Accept a raw JSON string (file upload) or an already-parsed list.
         if isinstance(input_data, str):
-            return input_data
-        if isinstance(input_data, dict) and isinstance(input_data.get("text"), str):
-            return input_data["text"]
-        raise ValueError("naive_bayes expects a labeled text file or list of examples")
+            try:
+                input_data = json.loads(input_data)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"naive_bayes: could not parse input as JSON — {exc}") from exc
+
+        if not isinstance(input_data, list):
+            raise ValueError(
+                "naive_bayes expects a JSON array of "
+                '{"label": str, "text": str} objects'
+            )
+
+        parsed = []
+        for i, item in enumerate(input_data):
+            if not isinstance(item, dict):
+                raise ValueError(f"naive_bayes: item {i} is not a JSON object")
+            if "label" not in item:
+                raise ValueError(f"naive_bayes: item {i} is missing required key 'label'")
+            if "text" not in item or not isinstance(item["text"], str):
+                raise ValueError(f"naive_bayes: item {i} is missing required key 'text' (must be a string)")
+            parsed.append({"label": item["label"], "text": item["text"]})
+
+        return parsed
 
     # All split does is partition the input list into roughly equal contiguous chunks.
     def split(self, input_data: List[Dict[str, Any]], num_chunks: int) -> List[List[Dict[str, Any]]]:
@@ -63,39 +86,35 @@ class NaiveBayesProblem(BaseProblem):
         return chunks
 
     def solve(self, chunk: List[Dict[str, Any]]) -> Dict[str, Any]:
+        import re
+
         # Count how many training examples belong to each class.
         # Example: {"spam": 5, "ham": 3}
         class_counts = Counter()
 
-        # Count the total number of feature occurrences within each class.
-        # Example: if "spam" documents contain 20 total word occurrences,
-        # then total_feature_count["spam"] = 20.
+        # Count the total number of token occurrences within each class.
         total_feature_count = Counter()
 
-        # For each class, count how many times each feature appears.
+        # For each class, count how many times each token appears.
         feature_counts = defaultdict(Counter)
 
-        # Track all distinct features seen in this chunk.
+        # Track all distinct tokens seen in this chunk.
         vocabulary = set()
 
         for example in chunk:
             label = example["label"]
-            features = example["features"]   # dict: feature -> count
+            raw_text = example["text"]
 
-            # For each example of a feature, increment the class count and update feature counts.
+            # Tokenize: lowercase, keep only alphabetic tokens of length >= 2.
+            tokens = re.findall(r"[a-z]{2,}", raw_text.lower())
+
             class_counts[label] += 1
 
-            for feature, value in features.items():
-                # Protect against negative feature counts.
-                if value < 0:
-                    raise ValueError(f"Feature counts must be nonnegative, got {value} for {feature}")
-
-                # Add this feature's count to the class-specific feature totals.
-                feature_counts[label][feature] += value
-                # Add this feature's count to the overall total for this class.
-                total_feature_count[label] += value
-                # Add this feature to the vocabulary set.
-                vocabulary.add(feature)
+            token_counts = Counter(tokens)
+            for token, count in token_counts.items():
+                feature_counts[label][token] += count
+                total_feature_count[label] += count
+                vocabulary.add(token)
 
         return {
             "class_counts": dict(class_counts),
